@@ -38,17 +38,14 @@ pub(crate) struct MetricsBatch {
 
     /// If `Some`, tracks poll times in nanoseconds
     poll_timer: Option<PollTimer>,
-
-    /// Instant when the most recent task started polling.
-    poll_started_at: Instant,
-
-    /// The longest poll time seen in this batch, in nanoseconds.
-    longest_poll: u64,
 }
 
 struct PollTimer {
     /// Histogram of poll counts within each band.
     poll_counts: HistogramBatch,
+
+    /// Instant when the most recent task started polling.
+    poll_started_at: Instant,
 }
 
 impl MetricsBatch {
@@ -66,14 +63,13 @@ impl MetricsBatch {
             overflow_count: 0,
             busy_duration_total: 0,
             processing_scheduled_tasks_started_at: now,
-            poll_started_at: now,
             poll_timer: worker_metrics
                 .poll_count_histogram
                 .as_ref()
                 .map(|worker_poll_counts| PollTimer {
                     poll_counts: HistogramBatch::from_histogram(worker_poll_counts),
+                    poll_started_at: now,
                 }),
-            longest_poll: 0,
         }
     }
 
@@ -100,17 +96,6 @@ impl MetricsBatch {
             let dst = worker.poll_count_histogram.as_ref().unwrap();
             poll_timer.poll_counts.submit(dst);
         }
-
-        // BUG? submit() never gets called on the worker with the unusually long time.
-        // Seems like we're submitting the same worker repeatedly.
-
-        eprintln!(
-            "submit: prev longest: {}, this longest: {}",
-            worker.longest_poll.load(Relaxed),
-            self.longest_poll
-        );
-        worker.longest_poll.store_max(self.longest_poll, Relaxed);
-        //worker.longest_poll.store(0, Relaxed);
     }
 
     /// The worker is about to park.
@@ -138,22 +123,17 @@ impl MetricsBatch {
     /// Start polling an individual task
     pub(crate) fn start_poll(&mut self) {
         self.poll_count += 1;
-        self.poll_started_at = Instant::now();
+
+        if let Some(poll_timer) = &mut self.poll_timer {
+            poll_timer.poll_started_at = Instant::now();
+        }
     }
 
     /// Stop polling an individual task
     pub(crate) fn end_poll(&mut self) {
-        self.poll_count += 1;
-        let elapsed_dur = self.poll_started_at.elapsed();
-        let elapsed = duration_as_u64(elapsed_dur);
-        eprintln!("poll time: {elapsed_dur:?}, {elapsed}");
-
         if let Some(poll_timer) = &mut self.poll_timer {
+            let elapsed = duration_as_u64(poll_timer.poll_started_at.elapsed());
             poll_timer.poll_counts.measure(elapsed, 1);
-        }
-        if elapsed > self.longest_poll {
-            self.longest_poll = elapsed;
-            eprintln!("new longest poll time {elapsed}");
         }
     }
 

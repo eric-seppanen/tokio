@@ -36,10 +36,6 @@ impl MetricAtomicU64 {
         pub(crate) fn add(&self, value: u64, ordering: Ordering) {
             self.value.fetch_add(value, ordering);
         }
-
-        pub(crate) fn store_max(&self, val: u64, ordering: Ordering) {
-            self.value.fetch_max(val, ordering);
-        }
     }
 
     cfg_no_64bit_metrics! {

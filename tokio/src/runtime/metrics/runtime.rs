@@ -49,17 +49,6 @@ impl RuntimeMetrics {
 
     cfg_unstable_metrics! {
 
-        /// Returns the duration of the longest poll, in nanoseconds.
-        pub fn longest_poll(&self, worker: usize) -> u64 {
-            self.handle
-                .inner
-                .worker_metrics(worker)
-                .longest_poll
-                .load(Relaxed)
-
-
-        }
-
         /// Returns the number of additional threads spawned by the runtime.
         ///
         /// The number of workers is set by configuring `max_blocking_threads` on
