@@ -2,8 +2,10 @@ use crate::future::Future;
 use crate::runtime::task::core::{Core, Trailer};
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
 
+use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
+use std::time::{Duration, Instant};
 
 /// Raw task handle
 #[derive(Clone)]
@@ -33,6 +35,9 @@ pub(super) struct Vtable {
     /// Scheduler is being shutdown.
     pub(super) shutdown: unsafe fn(NonNull<Header>),
 
+    // The type name attached to the future.
+    pub(super) type_name: fn() -> &'static str,
+
     /// The number of bytes that the `trailer` field is offset from the header.
     pub(super) trailer_offset: usize,
 
@@ -53,6 +58,7 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
         drop_join_handle_slow: drop_join_handle_slow::<T, S>,
         drop_abort_handle: drop_abort_handle::<T, S>,
         shutdown: shutdown::<T, S>,
+        type_name: type_name::<T>,
         trailer_offset: OffsetHelper::<T, S>::TRAILER_OFFSET,
         scheduler_offset: OffsetHelper::<T, S>::SCHEDULER_OFFSET,
         id_offset: OffsetHelper::<T, S>::ID_OFFSET,
@@ -197,8 +203,18 @@ impl RawTask {
 
     /// Safety: mutual exclusion is required to call this function.
     pub(crate) fn poll(self) {
+        let start_time = Instant::now();
         let vtable = self.header().vtable;
         unsafe { (vtable.poll)(self.ptr) }
+        let poll_duration = start_time.elapsed();
+        if poll_duration > Duration::from_millis(500) {
+            let name = (vtable.type_name)();
+            eprintln!("long poll {poll_duration:?} {name}");
+        }
+    }
+
+    pub(crate) fn type_name(&self) -> &'static str {
+        (self.header().vtable.type_name)()
     }
 
     pub(super) fn schedule(self) {
@@ -265,6 +281,10 @@ impl RawTask {
 }
 
 impl Copy for RawTask {}
+
+fn type_name<T: Future>() -> &'static str {
+    std::any::type_name::<T>()
+}
 
 unsafe fn poll<T: Future, S: Schedule>(ptr: NonNull<Header>) {
     let harness = Harness::<T, S>::from_raw(ptr);
