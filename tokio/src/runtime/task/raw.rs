@@ -1,11 +1,11 @@
 use crate::future::Future;
+use crate::hacks::check_long_poll;
 use crate::runtime::task::core::{Core, Trailer};
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
 
-use std::os::raw::c_void;
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// Raw task handle
 #[derive(Clone)]
@@ -202,19 +202,14 @@ impl RawTask {
     }
 
     /// Safety: mutual exclusion is required to call this function.
-    pub(crate) fn poll(self) {
+    pub(crate) fn poll(self, extra_checks: bool) {
         let start_time = Instant::now();
         let vtable = self.header().vtable;
         unsafe { (vtable.poll)(self.ptr) }
-        let poll_duration = start_time.elapsed();
-        if poll_duration > Duration::from_millis(500) {
-            let name = (vtable.type_name)();
-            eprintln!("long poll {poll_duration:?} {name}");
+        if extra_checks {
+            let poll_duration = start_time.elapsed();
+            check_long_poll(poll_duration, vtable.type_name);
         }
-    }
-
-    pub(crate) fn type_name(&self) -> &'static str {
-        (self.header().vtable.type_name)()
     }
 
     pub(super) fn schedule(self) {

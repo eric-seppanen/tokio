@@ -424,7 +424,7 @@ impl<S: Schedule> LocalNotified<S> {
     pub(crate) fn run(self) {
         let raw = self.task.raw;
         mem::forget(self);
-        raw.poll();
+        raw.poll(true);
     }
 }
 
@@ -461,7 +461,9 @@ impl<S: Schedule> UnownedTask<S> {
         };
 
         // Use the other ref-count to poll the task.
-        raw.poll();
+
+        // FIXME: I assume here that "unowned" means a BlockingTask, which is probably wrong.
+        raw.poll(false);
         // Decrement our extra ref-count
         drop(task);
     }

@@ -490,6 +490,8 @@ linux, on `aarch64`, `x86` and `x86_64`."
 #[doc(hidden)]
 pub mod macros;
 
+pub mod hacks;
+
 cfg_fs! {
     pub mod fs;
 }
