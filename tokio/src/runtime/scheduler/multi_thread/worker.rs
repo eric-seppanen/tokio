@@ -950,6 +950,7 @@ impl Core {
 
     /// Runs maintenance work such as checking the pool's state.
     fn maintenance(&mut self, worker: &Worker) {
+        eprintln!("maintenance, worker {}", worker.index);
         self.stats
             .submit(&worker.handle.shared.worker_metrics[worker.index]);
 

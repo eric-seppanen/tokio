@@ -110,12 +110,14 @@ impl Stats {
     }
 
     pub(crate) fn start_poll(&mut self) {
+        eprintln!("start_poll");
         self.batch.start_poll();
 
         self.tasks_polled_in_batch += 1;
     }
 
     pub(crate) fn end_poll(&mut self) {
+        eprintln!("end_poll");
         self.batch.end_poll();
     }
 

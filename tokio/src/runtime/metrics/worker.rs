@@ -49,6 +49,9 @@ pub(crate) struct WorkerMetrics {
 
     /// If `Some`, tracks the number of polls by duration range.
     pub(super) poll_count_histogram: Option<Histogram>,
+
+    /// Longest poll, in nanoseconds.
+    pub(super) longest_poll: MetricAtomicU64,
 }
 
 impl WorkerMetrics {
@@ -74,6 +77,7 @@ impl WorkerMetrics {
             local_schedule_count: MetricAtomicU64::new(0),
             queue_depth: AtomicUsize::new(0),
             poll_count_histogram: None,
+            longest_poll: MetricAtomicU64::new(0),
         }
     }
 
